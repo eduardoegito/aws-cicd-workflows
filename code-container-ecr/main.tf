@@ -6,13 +6,13 @@ data "aws_s3_bucket" "codepipeline_artifacts_s3_bucket" {
   bucket = var.codepipeline_artifacts_s3_bucket_name
 }
 
-resource "aws_codecommit_repository" "hugo_repo" {
+resource "aws_codecommit_repository" "code_repo" {
   repository_name = var.codecommit_repo_name
   description     = "The AWS CodeCommit repository where the code to build the container will be stored."
   default_branch  = var.codecommit_repo_default_branch_name
 }
 
-resource "aws_ecr_repository" "hugo_repo" {
+resource "aws_ecr_repository" "ecr_repo" {
   name                 = var.ecr_repo_name
   image_tag_mutability = "MUTABLE"
 
@@ -21,9 +21,9 @@ resource "aws_ecr_repository" "hugo_repo" {
   }
 }
 
-resource "aws_codebuild_project" "hugo_imagebuild_project" {
+resource "aws_codebuild_project" "imagebuild_project" {
   name          = var.codebuild_project_name
-  description   = "AWS CodeBuild Project to build the container imager for hugo"
+  description   = "AWS CodeBuild Project to build the container image"
   build_timeout = "5"
   service_role  = aws_iam_role.codebuild_service_role.arn
 
@@ -49,7 +49,7 @@ resource "aws_codebuild_project" "hugo_imagebuild_project" {
 
     environment_variable {
       name  = "ECR_REPO_NAME"
-      value = aws_ecr_repository.hugo_repo.name
+      value = aws_ecr_repository.ecr_repo.name
     }
     environment_variable {
       name  = "IMAGE_TAG_PREFIX"
@@ -66,7 +66,7 @@ resource "aws_codebuild_project" "hugo_imagebuild_project" {
 
   source {
     type            = "CODECOMMIT"
-    location        = aws_codecommit_repository.hugo_repo.clone_url_http
+    location        = aws_codecommit_repository.code_repo.clone_url_http
     git_clone_depth = 1
 
     git_submodules_config {
@@ -80,11 +80,11 @@ resource "aws_codebuild_project" "hugo_imagebuild_project" {
 }
 
 # create a KMS customer managed key that will be used to encrypt the codepipeline artifacts
-resource "aws_kms_key" "hugo_kms_key" {
-  description = "KMS key used by hugo CodePipeline pipeline"
+resource "aws_kms_key" "project_kms_key" {
+  description = "KMS key used by project CodePipeline pipeline"
 }
 
-resource "aws_codepipeline" "hugo_imagebuild_pipeline" {
+resource "aws_codepipeline" "imagebuild_pipeline" {
   name     = var.codepipeline_pipeline_name
   role_arn = aws_iam_role.codepipeline_role.arn
   artifact_store {
@@ -92,7 +92,7 @@ resource "aws_codepipeline" "hugo_imagebuild_pipeline" {
     type     = "S3"
 
     encryption_key {
-      id   = aws_kms_key.hugo_kms_key.id
+      id   = aws_kms_key.project_kms_key.id
       type = "KMS"
     }
   }
@@ -107,7 +107,7 @@ resource "aws_codepipeline" "hugo_imagebuild_pipeline" {
       output_artifacts = ["source_output"]
 
       configuration = {
-        RepositoryName       = aws_codecommit_repository.hugo_repo.id
+        RepositoryName       = aws_codecommit_repository.code_repo.id
         BranchName           = "main"
         PollForSourceChanges = "false"
       }
@@ -127,7 +127,7 @@ resource "aws_codepipeline" "hugo_imagebuild_pipeline" {
       version          = "1"
 
       configuration = {
-        ProjectName = aws_codebuild_project.hugo_imagebuild_project.name
+        ProjectName = aws_codebuild_project.imagebuild_project.name
       }
     }
   }
@@ -146,7 +146,7 @@ resource "aws_cloudwatch_event_rule" "trigger_image_build" {
     "CodeCommit Repository State Change"
   ],
   "resources": [ 
-    "${aws_codecommit_repository.hugo_repo.arn}"
+    "${aws_codecommit_repository.code_repo.arn}"
   ],
   "detail": {
     "event": [
@@ -165,9 +165,9 @@ PATTERN
 }
 
 resource "aws_cloudwatch_event_target" "trigger_image_build" {
-  target_id = "trigger_hugo_image_build"
+  target_id = "trigger_image_build"
   rule      = aws_cloudwatch_event_rule.trigger_image_build.id
-  arn       = aws_codepipeline.hugo_imagebuild_pipeline.arn
+  arn       = aws_codepipeline.imagebuild_pipeline.arn
 
   role_arn = aws_iam_role.cloudwatch_events_role.arn
 }

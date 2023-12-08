@@ -54,7 +54,7 @@ resource "aws_iam_role_policy" "codebuild_service_role_policy" {
         "ecr:UploadLayerPart"
       ],
       "Resource": [
-        "${aws_ecr_repository.hugo_repo.arn}"
+        "${aws_ecr_repository.ecr_repo.arn}"
       ]
     },
     {
@@ -88,7 +88,7 @@ resource "aws_iam_role_policy" "codebuild_service_role_policy" {
           "kms:Decrypt"
         ],
       "Resource": [
-          "${aws_kms_key.hugo_kms_key.arn}"
+          "${aws_kms_key.project_kms_key.arn}"
         ]
     }
   ]
@@ -156,7 +156,7 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
       "Sid": "AccessToCodeCommitRepo",      
       "Effect": "Allow",
       "Resource": [
-        "${aws_codecommit_repository.hugo_repo.arn}"
+        "${aws_codecommit_repository.code_repo.arn}"
       ],
       "Action": [
         "codecommit:GetBranch",
@@ -213,7 +213,7 @@ resource "aws_iam_role_policy" "cloudwatch_events_policy" {
         "codepipeline:StartPipelineExecution"
       ],
       "Resource": [
-        "${aws_codepipeline.hugo_imagebuild_pipeline.arn}"
+        "${aws_codepipeline.imagebuild_pipeline.arn}"
       ]
     }
   ]
