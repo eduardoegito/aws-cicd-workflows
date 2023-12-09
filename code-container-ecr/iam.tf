@@ -149,7 +149,7 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
           "kms:Decrypt"
         ],
       "Resource": [
-          "${aws_kms_key.hugo_kms_key.arn}"
+          "${aws_kms_key.project_kms_key.arn}"
         ]
     },
     {
