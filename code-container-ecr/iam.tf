@@ -345,9 +345,30 @@ data "aws_iam_policy_document" "codedeploy" {
     sid    = "AllowS3"
     effect = "Allow"
 
-    actions = ["s3:GetObject"]
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:GetBucketVersioning",
+      "s3:PutObjectAcl",
+      "s3:PutObject"
+    ]
 
     resources = ["${data.aws_s3_bucket.codepipeline_artifacts_s3_bucket.arn}/*"]
+  }
+
+  statement {
+    sid    = "AllowKMS"
+    effect = "Allow"
+
+    actions = [
+      "kms:DescribeKey",
+      "kms:GenerateDataKey*",
+      "kms:Encrypt",
+      "kms:ReEncrypt*",
+      "kms:Decrypt"
+    ]
+
+    resources = [aws_kms_key.project_kms_key.arn]
   }
 
   statement {
@@ -356,9 +377,7 @@ data "aws_iam_policy_document" "codedeploy" {
 
     actions = ["iam:PassRole"]
 
-    resources = [
-      aws_iam_role.task_definition_role.arn
-    ]
+    resources = [aws_iam_role.task_definition_role.arn]
   }
 }
 
