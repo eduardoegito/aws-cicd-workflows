@@ -5,6 +5,7 @@ PROJECT_NAME=$2
 ENV=$3
 
 export TF_VAR_env=${ENV}
+export TF_VAR_project_name=${PROJECT_NAME}
 export TF_VAR_codecommit_repo_name=${PROJECT_NAME}_${ENV}
 export TF_VAR_ecr_repo_name=${PROJECT_NAME}_${ENV}
 export TF_VAR_codebuild_project_name=${PROJECT_NAME}_${ENV}_imagebuild

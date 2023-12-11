@@ -63,6 +63,12 @@ resource "aws_iam_role_policy" "codebuild_service_role_policy" {
       "Resource": "*"
     },
     {
+      "Sid": "AllowGetTaskDefinition",
+      "Effect": "Allow",
+      "Action": "ecs:DescribeTaskDefinition",
+      "Resource": "*"
+    },
+    {
       "Sid": "CodeBuildAccessToS3",
       "Effect":"Allow",
       "Action": [
@@ -142,18 +148,16 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
       "Sid": "CodePipelineAccesstoKMSCMK",
       "Effect": "Allow",
       "Action": [
-          "kms:DescribeKey",
-          "kms:GenerateDataKey*",
-          "kms:Encrypt",
-          "kms:ReEncrypt*",
-          "kms:Decrypt"
-        ],
-      "Resource": [
-          "${aws_kms_key.project_kms_key.arn}"
-        ]
+        "kms:DescribeKey",
+        "kms:GenerateDataKey*",
+        "kms:Encrypt",
+        "kms:ReEncrypt*",
+        "kms:Decrypt"
+      ],
+      "Resource": ["${aws_kms_key.project_kms_key.arn}"]
     },
     {
-      "Sid": "AccessToCodeCommitRepo",      
+      "Sid": "AccessToCodeCommitRepo",
       "Effect": "Allow",
       "Resource": [
         "${aws_codecommit_repository.code_repo.arn}"
@@ -167,10 +171,40 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
       ]
     },
     {
+      "Sid": "AllowCodeBuild",
       "Effect": "Allow",
       "Action": [
         "codebuild:BatchGetBuilds",
         "codebuild:StartBuild"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowCodeDeploy",
+      "Effect": "Allow",
+      "Resource": "*",
+      "Action": [
+        "codedeploy:CreateDeployment",
+        "codedeploy:GetApplication",
+        "codedeploy:GetApplicationRevision",
+        "codedeploy:GetDeployment",
+        "codedeploy:GetDeploymentConfig",
+        "codedeploy:RegisterApplicationRevision"
+      ]
+    },
+    {
+      "Sid": "AllowECS",
+      "Effect": "Allow",
+      "Action": [
+        "ecs:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowPassRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
       ],
       "Resource": "*"
     }
@@ -219,4 +253,116 @@ resource "aws_iam_role_policy" "cloudwatch_events_policy" {
   ]
 }
 EOF
+}
+
+resource "aws_iam_role" "task_definition_role" {
+  name = "${var.project_name}_task_definition"
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy" "task_definition_policy" {
+  name = "${var.project_name}_task_definition_policy"
+  role = aws_iam_role.task_definition_role.id
+  policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetAuthorizationToken",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "secretsmanager:GetSecretValue",
+        "ssm:GetParameters"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}
+EOF
+}
+
+
+data "aws_iam_policy_document" "codedeploy_assume_policy" {
+  statement {
+    sid     = ""
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["codedeploy.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "codedeploy" {
+  name               = "codedeploy"
+  assume_role_policy = data.aws_iam_policy_document.codedeploy_assume_policy.json
+}
+
+data "aws_iam_policy_document" "codedeploy" {
+  statement {
+    sid    = "AllowLoadBalancingAndECSModifications"
+    effect = "Allow"
+
+    actions = [
+      "ecs:CreateTaskSet",
+      "ecs:DeleteTaskSet",
+      "ecs:DescribeServices",
+      "ecs:UpdateServicePrimaryTaskSet",
+      "elasticloadbalancing:DescribeListeners",
+      "elasticloadbalancing:DescribeRules",
+      "elasticloadbalancing:DescribeTargetGroups",
+      "elasticloadbalancing:ModifyListener",
+      "elasticloadbalancing:ModifyRule",
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowS3"
+    effect = "Allow"
+
+    actions = ["s3:GetObject"]
+
+    resources = ["${data.aws_s3_bucket.codepipeline_artifacts_s3_bucket.arn}/*"]
+  }
+
+  statement {
+    sid    = "AllowPassRole"
+    effect = "Allow"
+
+    actions = ["iam:PassRole"]
+
+    resources = [
+      aws_iam_role.task_definition_role.arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "codedeploy" {
+  role   = aws_iam_role.codedeploy.name
+  policy = data.aws_iam_policy_document.codedeploy.json
 }

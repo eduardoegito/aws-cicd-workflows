@@ -1,3 +1,10 @@
+locals {
+  target_groups = [
+    "green",
+    "blue",
+  ]
+}
+
 resource "aws_security_group" "project_sg" {
   name   = "allow-http"
   vpc_id = aws_vpc.project_vpc.id
@@ -34,7 +41,8 @@ resource "aws_lb" "project_lb" {
 }
 
 resource "aws_lb_target_group" "project_lb_tg" {
-  name = "project-tg"
+  count = length(local.target_groups)
+  name = "project-tg-${element(local.target_groups, count.index)}"
 
   port        = 80
   protocol    = "HTTP"
@@ -54,7 +62,7 @@ resource "aws_lb_listener" "project_lb_listener" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.project_lb_tg.arn
+    target_group_arn = aws_lb_target_group.project_lb_tg.*.arn[0]
   }
 }
 
@@ -63,7 +71,7 @@ resource "aws_lb_listener_rule" "project_lb_lr" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.project_lb_tg.arn
+    target_group_arn = aws_lb_target_group.project_lb_tg.*.arn[0]
   }
 
   condition {
