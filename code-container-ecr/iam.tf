@@ -54,7 +54,7 @@ resource "aws_iam_role_policy" "codebuild_service_role_policy" {
         "ecr:UploadLayerPart"
       ],
       "Resource": [
-        "${aws_ecr_repository.ecr_repo.arn}"
+        "*"
       ]
     },
     {

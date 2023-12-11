@@ -44,7 +44,7 @@ resource "aws_codebuild_project" "project_codebuild" {
 
     environment_variable {
       name  = "CONTAINER_NAME"
-      value = local.image_repo_url
+      value = var.project_name
     }
 
     environment_variable {
